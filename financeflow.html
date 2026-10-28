@@ -1,0 +1,1313 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinanceFlow — Личный бюджет и курсы валют</title>
+    <meta name="description" content="Умное управление личными финансами, конвертация валют в реальном времени с помощью ExchangeRate-API и планирование бюджета.">
+    <style>
+        /* ==========================================================================
+           1. DESIGN TOKENS & RESET (SHARP & CONTRAST TECH/DARK THEME - NEON GREEN)
+           ========================================================================== */
+        :root {
+            --bg-dark: #030712;
+            --bg-pure-black: #000000;
+            --bg-card: #080f0c;
+            --bg-card-hover: #0f1c16;
+            
+            --accent-green-bright: #10b981;
+            --accent-lime: #22c55e;
+            --accent-neon: #4ade80;
+            
+            --line-dark-green: #064e3b;
+            --line-mid-green: #047857;
+            --line-bright-green: #059669;
+            
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --text-dim: #64748b;
+            
+            --border-sharp: 1px solid var(--line-dark-green);
+            --border-active: 1px solid var(--accent-green-bright);
+            --border-neon: 1px solid var(--accent-lime);
+            
+            --radius-none: 0px;
+            --font-family: 'Consolas', 'Courier New', system-ui, -apple-system, sans-serif;
+            --transition-fast: all 0.15s cubic-bezier(0, 0, 0.2, 1);
+            --container-max-width: 1200px;
+        }
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            border-radius: 0 !important; /* Strict sharp corners requirement */
+        }
+
+        html {
+            scroll-behavior: smooth;
+            font-family: var(--font-family);
+            background-color: var(--bg-pure-black);
+            color: var(--text-main);
+            line-height: 1.5;
+        }
+
+        body {
+            overflow-x: hidden;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background-image: 
+                linear-gradient(to right, rgba(6, 78, 59, 0.2) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(6, 78, 59, 0.2) 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+
+        /* Focus Styles for Accessibility */
+        a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible {
+            outline: 2px solid var(--accent-lime);
+            outline-offset: 2px;
+        }
+
+        /* Container Layout */
+        .container {
+            width: 100%;
+            max-width: var(--container-max-width);
+            margin: 0 auto;
+            padding: 0 1.25rem;
+        }
+
+        /* Tech corner design detail */
+        .tech-box {
+            position: relative;
+            background-color: var(--bg-card);
+            border: var(--border-sharp);
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+            transition: var(--transition-fast);
+        }
+
+        .tech-box::before {
+            content: '';
+            position: absolute;
+            top: -1px;
+            left: -1px;
+            width: 8px;
+            height: 8px;
+            border-top: 2px solid var(--accent-green-bright);
+            border-left: 2px solid var(--accent-green-bright);
+        }
+
+        .tech-box::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            right: -1px;
+            width: 8px;
+            height: 8px;
+            border-bottom: 2px solid var(--accent-green-bright);
+            border-right: 2px solid var(--accent-green-bright);
+        }
+
+        /* ==========================================================================
+           2. HEADER & NAVIGATION
+           ========================================================================== */
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.95);
+            border-bottom: 2px solid var(--line-dark-green);
+            transition: var(--transition-fast);
+        }
+
+        .nav-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 70px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: var(--text-main);
+            text-decoration: none;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            background: var(--bg-pure-black);
+            border: 2px solid var(--accent-green-bright);
+            display: grid;
+            place-items: center;
+            font-weight: 900;
+            color: var(--accent-neon);
+            box-shadow: inset 0 0 10px rgba(16, 185, 129, 0.3);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            list-style: none;
+        }
+
+        .nav-link {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: var(--transition-fast);
+            padding: 0.5rem 0;
+            position: relative;
+        }
+
+        .nav-link:hover {
+            color: var(--accent-neon);
+        }
+
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background-color: var(--accent-green-bright);
+            transition: var(--transition-fast);
+        }
+
+        .nav-link:hover::after {
+            width: 100%;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.75rem 1.5rem;
+            font-weight: 700;
+            text-decoration: none;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: var(--transition-fast);
+            gap: 0.5rem;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-family: var(--font-family);
+        }
+
+        .btn-primary {
+            background-color: var(--line-bright-green);
+            color: #ffffff;
+            border: 1px solid var(--accent-neon);
+            box-shadow: 4px 4px 0px #000000, 4px 4px 0px 1px var(--accent-green-bright);
+        }
+
+        .btn-primary:hover {
+            background-color: var(--accent-green-bright);
+            transform: translate(-2px, -2px);
+            box-shadow: 6px 6px 0px #000000, 6px 6px 0px 1px var(--accent-lime);
+        }
+
+        .btn-secondary {
+            background-color: var(--bg-pure-black);
+            color: var(--text-main);
+            border: 1px solid var(--line-mid-green);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--accent-green-bright);
+            background-color: var(--bg-card);
+            color: var(--accent-neon);
+        }
+
+        /* Mobile Menu Toggle */
+        .mobile-toggle {
+            display: none;
+            background: var(--bg-pure-black);
+            border: 1px solid var(--line-mid-green);
+            color: var(--accent-neon);
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0.4rem 0.8rem;
+        }
+
+        /* Mobile Drawer */
+        .mobile-menu {
+            position: fixed;
+            top: 70px;
+            left: 0;
+            width: 100%;
+            height: calc(100vh - 70px);
+            background-color: var(--bg-pure-black);
+            border-bottom: 2px solid var(--accent-green-bright);
+            padding: 2rem 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            transform: translateX(100%);
+            transition: transform 0.2s ease-in-out;
+            z-index: 99;
+        }
+
+        .mobile-menu.active {
+            transform: translateX(0);
+        }
+
+        .mobile-menu .nav-links {
+            flex-direction: column;
+            gap: 1.5rem;
+            font-size: 1.2rem;
+        }
+
+        /* ==========================================================================
+           3. HERO SECTION
+           ========================================================================== */
+        .hero {
+            padding: 140px 0 80px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 3rem;
+            align-items: center;
+        }
+
+        .hero-title {
+            font-size: clamp(2rem, 4.5vw, 3.2rem);
+            line-height: 1.1;
+            font-weight: 900;
+            margin-bottom: 1.25rem;
+            text-transform: uppercase;
+            letter-spacing: -0.5px;
+            color: #ffffff;
+            border-left: 4px solid var(--accent-green-bright);
+            padding-left: 1rem;
+        }
+
+        .hero-subtitle {
+            font-size: 1rem;
+            color: var(--text-muted);
+            margin-bottom: 2rem;
+            max-width: 520px;
+            line-height: 1.7;
+        }
+
+        .hero-cta {
+            display: flex;
+            gap: 1.25rem;
+            flex-wrap: wrap;
+        }
+
+        .hero-card-preview {
+            padding: 2rem;
+            border: 2px solid var(--line-mid-green);
+        }
+
+        .preview-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px dashed var(--line-dark-green);
+            padding-bottom: 1rem;
+        }
+
+        .preview-balance {
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: var(--accent-lime);
+            letter-spacing: 1px;
+        }
+
+        /* ==========================================================================
+           4. WIDGET: LIVE CURRENCY CONVERTER (EXCHANGERATE-API)
+           ========================================================================== */
+        .rates-section {
+            padding: 80px 0;
+            background-color: var(--bg-pure-black);
+            border-top: 2px solid var(--line-dark-green);
+            border-bottom: 2px solid var(--line-dark-green);
+            position: relative;
+        }
+
+        .section-header {
+            text-align: left;
+            margin-bottom: 3rem;
+            border-bottom: 1px solid var(--line-dark-green);
+            padding-bottom: 1rem;
+        }
+
+        .section-title {
+            font-size: 2rem;
+            font-weight: 800;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .section-title::before {
+            content: '//';
+            color: var(--accent-green-bright);
+        }
+
+        .section-subtitle {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        .currency-widget {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            padding: 2rem;
+            border: 1px solid var(--line-mid-green);
+        }
+
+        .converter-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .input-group label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .input-field, .select-field {
+            width: 100%;
+            padding: 0.85rem 1rem;
+            background-color: var(--bg-pure-black);
+            border: 1px solid var(--line-mid-green);
+            color: var(--text-main);
+            font-size: 1rem;
+            font-family: var(--font-family);
+            transition: var(--transition-fast);
+        }
+
+        .input-field:focus, .select-field:focus {
+            border-color: var(--accent-lime);
+            background-color: #04120a;
+        }
+
+        .converter-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .converter-result {
+            margin-top: 1rem;
+            padding: 1.25rem;
+            background-color: #04170d;
+            border: 1px solid var(--line-bright-green);
+            text-align: center;
+        }
+
+        .result-amount {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--accent-neon);
+            margin-top: 0.25rem;
+        }
+
+        .quick-rates {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .rate-card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem;
+            background-color: var(--bg-pure-black);
+            border: 1px solid var(--line-dark-green);
+            transition: var(--transition-fast);
+        }
+
+        .rate-card:hover {
+            border-color: var(--accent-green-bright);
+            background-color: var(--bg-card);
+        }
+
+        .rate-info {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .rate-flag {
+            font-size: 1.2rem;
+        }
+
+        .rate-val {
+            font-weight: 700;
+            color: var(--accent-lime);
+        }
+
+        .api-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.75rem;
+            color: var(--accent-lime);
+            background: #041a0e;
+            border: 1px solid var(--line-bright-green);
+            padding: 4px 12px;
+            margin-top: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* ==========================================================================
+           5. FEATURES / BENEFITS GRID
+           ========================================================================== */
+        .features {
+            padding: 90px 0;
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2rem;
+        }
+
+        .feature-card {
+            padding: 2rem;
+            border: 1px solid var(--line-dark-green);
+            background-color: var(--bg-card);
+            transition: var(--transition-fast);
+            position: relative;
+        }
+
+        .feature-card:hover {
+            border-color: var(--accent-green-bright);
+            transform: translateY(-4px);
+            box-shadow: 0 10px 30px -10px rgba(16, 185, 129, 0.2);
+        }
+
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            background: var(--bg-pure-black);
+            color: var(--accent-lime);
+            border: 1px solid var(--line-bright-green);
+            display: grid;
+            place-items: center;
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .feature-title {
+            font-size: 1.15rem;
+            font-weight: 700;
+            margin-bottom: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #ffffff;
+        }
+
+        .feature-desc {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        /* ==========================================================================
+           6. INTERACTIVE EXPENSE PLANNER (DEMO APP)
+           ========================================================================== */
+        .planner-section {
+            padding: 80px 0;
+            background-color: var(--bg-pure-black);
+            border-top: 2px solid var(--line-dark-green);
+            border-bottom: 2px solid var(--line-dark-green);
+        }
+
+        .planner-container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 2.5rem;
+            border: 1px solid var(--line-mid-green);
+        }
+
+        .planner-form {
+            display: grid;
+            grid-template-columns: 2fr 1.5fr 1fr 1fr;
+            gap: 0.75rem;
+            margin-bottom: 2rem;
+        }
+
+        .expense-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .expense-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background-color: var(--bg-pure-black);
+            border: 1px solid var(--line-dark-green);
+            transition: var(--transition-fast);
+        }
+
+        .expense-item:hover {
+            border-color: var(--line-mid-green);
+        }
+
+        .category-tag {
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            background: #062417;
+            border: 1px solid var(--line-bright-green);
+            color: var(--accent-neon);
+            margin-left: 0.75rem;
+            text-transform: uppercase;
+        }
+
+        .expense-delete {
+            background: var(--bg-pure-black);
+            border: 1px solid #ef4444;
+            color: #ef4444;
+            cursor: pointer;
+            font-size: 1rem;
+            padding: 0.2rem 0.6rem;
+            transition: var(--transition-fast);
+            font-family: var(--font-family);
+        }
+
+        .expense-delete:hover {
+            background-color: #ef4444;
+            color: #ffffff;
+        }
+
+        .planner-summary {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 1.25rem;
+            border-top: 2px dashed var(--line-dark-green);
+            font-weight: 800;
+            font-size: 1.25rem;
+            text-transform: uppercase;
+        }
+
+        /* ==========================================================================
+           7. FAQ SECTION (ACCORDION)
+           ========================================================================== */
+        .faq-section {
+            padding: 90px 0;
+        }
+
+        .faq-container {
+            max-width: 850px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .faq-item {
+            background-color: var(--bg-card);
+            border: 1px solid var(--line-dark-green);
+            transition: var(--transition-fast);
+        }
+
+        .faq-item.active {
+            border-color: var(--accent-green-bright);
+        }
+
+        .faq-button {
+            width: 100%;
+            padding: 1.25rem 1.5rem;
+            background: none;
+            border: none;
+            color: var(--text-main);
+            font-size: 1rem;
+            font-weight: 700;
+            text-align: left;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            font-family: var(--font-family);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .faq-icon {
+            font-size: 1.2rem;
+            color: var(--accent-lime);
+            transition: transform 0.2s ease;
+        }
+
+        .faq-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.2s ease, padding 0.2s ease;
+            color: var(--text-muted);
+            padding: 0 1.5rem;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        .faq-item.active .faq-content {
+            max-height: 200px;
+            padding: 0 1.5rem 1.25rem 1.5rem;
+            border-top: 1px stroke var(--line-dark-green);
+        }
+
+        .faq-item.active .faq-icon {
+            transform: rotate(45deg);
+        }
+
+        /* ==========================================================================
+           8. FOOTER & CONTACTS
+           ========================================================================== */
+        .footer {
+            background-color: var(--bg-pure-black);
+            border-top: 2px solid var(--line-dark-green);
+            padding: 60px 0 30px;
+            margin-top: auto;
+        }
+
+        .footer-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr;
+            gap: 3rem;
+            margin-bottom: 3rem;
+        }
+
+        .footer-desc {
+            color: var(--text-muted);
+            margin-top: 1rem;
+            max-width: 350px;
+            font-size: 0.85rem;
+            line-height: 1.6;
+        }
+
+        .footer-title {
+            font-size: 0.95rem;
+            font-weight: 800;
+            margin-bottom: 1.2rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--accent-lime);
+        }
+
+        .footer-links {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .footer-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.85rem;
+            transition: var(--transition-fast);
+        }
+
+        .footer-links a:hover {
+            color: var(--accent-neon);
+            padding-left: 4px;
+        }
+
+        .copyright {
+            text-align: center;
+            color: var(--text-dim);
+            font-size: 0.8rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--line-dark-green);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* ==========================================================================
+           9. ANIMATION CLASSES & ACCESSIBILITY
+           ========================================================================== */
+        .animate-on-scroll {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.4s ease-out, transform 0.4s ease-out;
+        }
+
+        .animate-on-scroll.animated {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Reduced Motion */
+        @media (prefers-reduced-motion: reduce) {
+            html {
+                scroll-behavior: auto;
+            }
+            .animate-on-scroll {
+                opacity: 1 !important;
+                transform: none !important;
+                transition: none !important;
+            }
+            .btn:hover, .feature-card:hover {
+                transform: none !important;
+            }
+        }
+
+        /* ==========================================================================
+           10. MEDIA QUERIES (RESPONSIVENESS)
+           ========================================================================== */
+        @media (max-width: 900px) {
+            .hero, .currency-widget, .grid-3, .footer-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .planner-form {
+                grid-template-columns: 1fr;
+            }
+
+            .nav-links, .nav-btn-desktop {
+                display: none;
+            }
+
+            .mobile-toggle {
+                display: block;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- HEADER / NAVIGATION -->
+    <header class="header">
+        <div class="container nav-container">
+            <a href="#" class="logo">
+                <div class="logo-icon">₽</div>
+                <span>FinanceFlow</span>
+            </a>
+            
+            <nav class="nav-btn-desktop">
+                <ul class="nav-links">
+                    <li><a href="#rates" class="nav-link">Курсы валют</a></li>
+                    <li><a href="#features" class="nav-link">Преимущества</a></li>
+                    <li><a href="#planner" class="nav-link">Планировщик</a></li>
+                    <li><a href="#faq" class="nav-link">Вопросы и ответы</a></li>
+                </ul>
+            </nav>
+
+            <a href="#planner" class="btn btn-primary nav-btn-desktop">Начать учет</a>
+
+            <button class="mobile-toggle" id="mobileToggle" aria-label="Открыть меню" aria-expanded="false">
+                [≡]
+            </button>
+        </div>
+    </header>
+
+    <!-- MOBILE MENU DRAWER -->
+    <div class="mobile-menu" id="mobileMenu">
+        <ul class="nav-links">
+            <li><a href="#rates" class="nav-link mobile-nav-link">Курсы валют</a></li>
+            <li><a href="#features" class="nav-link mobile-nav-link">Преимущества</a></li>
+            <li><a href="#planner" class="nav-link mobile-nav-link">Планировщик</a></li>
+            <li><a href="#faq" class="nav-link mobile-nav-link">Вопросы и ответы</a></li>
+        </ul>
+        <a href="#planner" class="btn btn-primary mobile-nav-link" style="text-align: center;">Начать учет</a>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <main>
+        <!-- HERO SECTION -->
+        <section class="hero container">
+            <div class="hero-text animate-on-scroll">
+                <h1 class="hero-title">Управляйте личным бюджетом с легкостью</h1>
+                <p class="hero-subtitle">
+                    Отслеживайте расходы, планируйте накопления и конвертируйте валюты в реальном времени с помощью проверенных финансовых данных.
+                </p>
+                <div class="hero-cta">
+                    <a href="#planner" class="btn btn-primary">Попробовать демо</a>
+                    <a href="#rates" class="btn btn-secondary">Курсы валют</a>
+                </div>
+            </div>
+            <div class="hero-card-preview tech-box animate-on-scroll">
+                <div class="preview-header">
+                    <div>
+                        <span style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px;">Общий баланс</span>
+                        <div class="preview-balance">284,500 ₽</div>
+                    </div>
+                    <span style="border: 1px solid var(--accent-lime); color: var(--accent-lime); padding: 0.3rem 0.7rem; font-size: 0.8rem; background: #041a0e;">+12.4%</span>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 0.8rem;">
+                    <div class="expense-item">
+                        <span>🛒 Продукты и супермаркеты</span>
+                        <span style="font-weight: 700; color: #ffffff;">-14,200 ₽</span>
+                    </div>
+                    <div class="expense-item">
+                        <span>✈️ Билеты в путешествие</span>
+                        <span style="font-weight: 700; color: #ffffff;">-42,000 ₽</span>
+                    </div>
+                    <div class="expense-item">
+                        <span>💻 Фриланс доход</span>
+                        <span style="font-weight: 700; color: var(--accent-lime);">+65,000 ₽</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- LIVE CURRENCY CONVERTER SECTION (EXCHANGERATE-API) -->
+        <section class="rates-section" id="rates">
+            <div class="container">
+                <div class="section-header animate-on-scroll">
+                    <h2 class="section-title">Курсы валют в реальном времени</h2>
+                    <p class="section-subtitle">Точная информация прямо из ExchangeRate-API</p>
+                    <div class="api-badge">● API Подключен и работает</div>
+                </div>
+
+                <div class="currency-widget tech-box animate-on-scroll">
+                    <!-- Interactive Converter -->
+                    <div class="converter-form">
+                        <h3 style="font-size: 1.1rem; text-transform: uppercase; letter-spacing: 1px;">Конвертер валют</h3>
+                        <div class="input-group">
+                            <label for="convertAmount">Сумма</label>
+                            <input type="number" id="convertAmount" class="input-field" value="100" min="1">
+                        </div>
+                        <div class="converter-row">
+                            <div class="input-group">
+                                <label for="fromCurrency">Из</label>
+                                <select id="fromCurrency" class="select-field">
+                                    <option value="USD" selected>USD - Доллар США</option>
+                                    <option value="EUR">EUR - Евро</option>
+                                    <option value="GBP">GBP - Фунт стерлингов</option>
+                                    <option value="RUB">RUB - Рубль</option>
+                                    <option value="CNY">CNY - Юань</option>
+                                    <option value="KZT">KZT - Тенге</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label for="toCurrency">В</label>
+                                <select id="toCurrency" class="select-field">
+                                    <option value="RUB" selected>RUB - Рубль</option>
+                                    <option value="USD">USD - Доллар США</option>
+                                    <option value="EUR">EUR - Евро</option>
+                                    <option value="KZT">KZT - Тенге</option>
+                                    <option value="CNY">CNY - Юань</option>
+                                    <option value="GBP">GBP - Фунт стерлингов</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="converter-result">
+                            <span style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Итоговый результат:</span>
+                            <div class="result-amount" id="resultDisplay">Загрузка...</div>
+                        </div>
+                    </div>
+
+                    <!-- Quick Rates Display Panel -->
+                    <div class="quick-rates">
+                        <h3 style="font-size: 1.1rem; text-transform: uppercase; letter-spacing: 1px;">Популярные курсы (к USD)</h3>
+                        <div id="ratesList" style="display: flex; flex-direction: column; gap: 0.75rem;">
+                            <div class="rate-card"><span>Загрузка данных об актуальных курсах...</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- FEATURES / BENEFITS SECTION -->
+        <section class="features container" id="features">
+            <div class="section-header animate-on-scroll">
+                <h2 class="section-title">Все инструменты для контроля денег</h2>
+                <p class="section-subtitle">Простые решения для сложных финансовых задач</p>
+            </div>
+
+            <div class="grid-3">
+                <div class="feature-card tech-box animate-on-scroll">
+                    <div class="feature-icon">📊</div>
+                    <h3 class="feature-title">Учет расходов и доходов</h3>
+                    <p class="feature-desc">Удобное распределение ваших трат по категориям и контроль бюджета в режиме реального времени.</p>
+                </div>
+                <div class="feature-card tech-box animate-on-scroll">
+                    <div class="feature-icon">💱</div>
+                    <h3 class="feature-title">Живые курсы валют</h3>
+                    <p class="feature-desc">Автоматическое обновление данных о мировых валютах с помощью официального API интегратора.</p>
+                </div>
+                <div class="feature-card tech-box animate-on-scroll">
+                    <div class="feature-icon">🎯</div>
+                    <h3 class="feature-title">Финансовые цели</h3>
+                    <p class="feature-desc">Устанавливайте лимиты на месяц и создавайте накопления на крупные покупки или путешествия.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- INTERACTIVE EXPENSE PLANNER DEMO -->
+        <section class="planner-section" id="planner">
+            <div class="container">
+                <div class="section-header animate-on-scroll">
+                    <h2 class="section-title">Учебный планировщик расходов</h2>
+                    <p class="section-subtitle">Попробуйте добавить свои первые записи прямо сейчас</p>
+                </div>
+
+                <div class="planner-container tech-box animate-on-scroll">
+                    <form id="expenseForm" class="planner-form">
+                        <input type="text" id="expenseTitle" class="input-field" placeholder="Название (напр., Кофе)" required>
+                        <select id="expenseCategory" class="select-field" required>
+                            <option value="Еда">🍔 Еда</option>
+                            <option value="Транспорт">🚗 Транспорт</option>
+                            <option value="Развлечения">🎬 Развлечения</option>
+                            <option value="Покупки">🛍️ Покупки</option>
+                        </select>
+                        <input type="number" id="expenseAmount" class="input-field" placeholder="Сумма (₽)" required min="1">
+                        <button type="submit" class="btn btn-primary">Добавить</button>
+                    </form>
+
+                    <ul class="expense-list" id="expenseList">
+                        <!-- Dynamic Items will appear here -->
+                    </ul>
+
+                    <div class="planner-summary">
+                        <span>Итого расходов:</span>
+                        <span id="totalExpenseDisplay" style="color: var(--accent-lime);">0 ₽</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- FAQ SECTION -->
+        <section class="faq-section container" id="faq">
+            <div class="section-header animate-on-scroll">
+                <h2 class="section-title">Часто задаваемые вопросы</h2>
+                <p class="section-subtitle">Всё, что вам нужно знать о работе сервиса</p>
+            </div>
+
+            <div class="faq-container animate-on-scroll">
+                <div class="faq-item">
+                    <button class="faq-button" aria-expanded="false">
+                        <span>Как обновляются курсы валют?</span>
+                        <span class="faq-icon">+</span>
+                    </button>
+                    <div class="faq-content">
+                        <p>Курсы валют загружаются автоматически через официальный API ExchangeRate-API. Данные обновляются в реальном времени при изменении значений в конвертере.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <button class="faq-button" aria-expanded="false">
+                        <span>Безопасно ли вводить данные о расходах?</span>
+                        <span class="faq-icon">+</span>
+                    </button>
+                    <div class="faq-content">
+                        <p>Да, абсолютно. В данном демо-режиме все введенные вами данные хранятся исключительно в памяти вашего браузера и не передаются на сторонние серверы.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <button class="faq-button" aria-expanded="false">
+                        <span>Какие валюты поддерживаются?</span>
+                        <span class="faq-icon">+</span>
+                    </button>
+                    <div class="faq-content">
+                        <p>Поддерживаются основные мировые валюты: USD, EUR, RUB, GBP, CNY, KZT и многие другие. В полной версии доступно более 160 валют мира.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- FOOTER & CONTACTS -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-grid">
+                <div>
+                    <a href="#" class="logo">
+                        <div class="logo-icon">₽</div>
+                        <span>FinanceFlow</span>
+                    </a>
+                    <p class="footer-desc">Ваш надежный помощник в мире личных финансов, учета расходов и валютных операций.</p>
+                </div>
+                <div>
+                    <h4 class="footer-title">Навигация</h4>
+                    <ul class="footer-links">
+                        <li><a href="#rates">Курсы валют</a></li>
+                        <li><a href="#features">Преимущества</a></li>
+                        <li><a href="#planner">Планировщик</a></li>
+                        <li><a href="#faq">Вопросы и ответы</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="footer-title">Контакты</h4>
+                    <ul class="footer-links">
+                        <li><a href="mailto:support@financeflow.edu">support@financeflow.edu</a></li>
+                        <li><span style="color: var(--text-muted); font-size: 0.85rem;">Москва, Учебный пер., д. 2</span></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="copyright">
+                © 2026 FinanceFlow. Учебный проект по теме «Личный бюджет». Все права защищены.
+            </div>
+        </div>
+    </footer>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script defer>
+        document.addEventListener('DOMContentLoaded', () => {
+            /* ==========================================================================
+               1. API INTEGRATION (ExchangeRate-API)
+               ========================================================================== */
+            const API_KEY = '27aeff1c528a03feb7cb80af';
+            const BASE_URL = `https://v6.exchangerate-api.com/v6/${API_KEY}`;
+
+            const convertAmountInput = document.getElementById('convertAmount');
+            const fromCurrencySelect = document.getElementById('fromCurrency');
+            const toCurrencySelect = document.getElementById('toCurrency');
+            const resultDisplay = document.getElementById('resultDisplay');
+            const ratesListContainer = document.getElementById('ratesList');
+
+            // Fetch Live Exchange Rates & Convert
+            async function fetchConversion() {
+                const amount = parseFloat(convertAmountInput.value) || 0;
+                const from = fromCurrencySelect.value;
+                const to = toCurrencySelect.value;
+
+                if (amount <= 0) {
+                    resultDisplay.textContent = '0 ' + to;
+                    return;
+                }
+
+                try {
+                    resultDisplay.textContent = 'Расчет...';
+                    const response = await fetch(`${BASE_URL}/pair/${from}/${to}/${amount}`);
+                    if (!response.ok) throw new Error('Ошибка сети');
+                    
+                    const data = await response.json();
+                    if (data.result === 'success') {
+                        const convertedValue = data.conversion_result.toLocaleString('ru-RU', {
+                            maximumFractionDigits: 2
+                        });
+                        resultDisplay.textContent = `${convertedValue} ${to}`;
+                    } else {
+                        resultDisplay.textContent = 'Ошибка данных';
+                    }
+                } catch (error) {
+                    console.error('API Error:', error);
+                    // Fallback calculation in case of network issue
+                    const mockRates = { USD: 92.5, EUR: 100.2, GBP: 117.0, RUB: 1, KZT: 0.2, CNY: 12.8 };
+                    const fallbackVal = ((amount * (mockRates[from] || 1)) / (mockRates[to] || 1)).toFixed(2);
+                    resultDisplay.textContent = `~ ${fallbackVal} ${to} (офлайн)`;
+                }
+            }
+
+            // Fetch Top Rates for Quick Panel
+            async function fetchTopRates() {
+                try {
+                    const response = await fetch(`${BASE_URL}/latest/USD`);
+                    if (!response.ok) throw new Error('Ошибка получения курсов');
+                    const data = await response.json();
+
+                    if (data.result === 'success') {
+                        const rates = data.conversion_rates;
+                        const targets = [
+                            { code: 'RUB', flag: '🇷🇺', name: 'Российский рубль' },
+                            { code: 'EUR', flag: '🇪🇺', name: 'Евро' },
+                            { code: 'CNY', flag: '🇨🇳', name: 'Китайский юань' },
+                            { code: 'GBP', flag: '🇬🇧', name: 'Фунт стерлингов' }
+                        ];
+
+                        ratesListContainer.innerHTML = '';
+                        targets.forEach(item => {
+                            const val = rates[item.code] ? rates[item.code].toFixed(2) : '-';
+                            const card = document.createElement('div');
+                            card.className = 'rate-card';
+                            card.innerHTML = `
+                                <div class="rate-info">
+                                    <span class="rate-flag">${item.flag}</span>
+                                    <span style="font-size: 0.85rem;">${item.name} (${item.code})</span>
+                                </div>
+                                <span class="rate-val">${val} ${item.code}</span>
+                            `;
+                            ratesListContainer.appendChild(card);
+                        });
+                    }
+                } catch (err) {
+                    ratesListContainer.innerHTML = `
+                        <div class="rate-card"><span>🇷🇺 RUB: ~92.50 ₽</span></div>
+                        <div class="rate-card"><span>🇪🇺 EUR: ~100.20 €</span></div>
+                    `;
+                }
+            }
+
+            // Event Listeners for Converter
+            convertAmountInput.addEventListener('input', fetchConversion);
+            fromCurrencySelect.addEventListener('change', fetchConversion);
+            toCurrencySelect.addEventListener('change', fetchConversion);
+
+            // Initial API Calls
+            fetchConversion();
+            fetchTopRates();
+
+            /* ==========================================================================
+               2. INTERACTIVE EXPENSE TRACKER DEMO
+               ========================================================================== */
+            const expenseForm = document.getElementById('expenseForm');
+            const expenseTitle = document.getElementById('expenseTitle');
+            const expenseCategory = document.getElementById('expenseCategory');
+            const expenseAmount = document.getElementById('expenseAmount');
+            const expenseList = document.getElementById('expenseList');
+            const totalExpenseDisplay = document.getElementById('totalExpenseDisplay');
+
+            let expenses = [
+                { id: 1, title: 'Продукты на неделю', category: 'Еда', amount: 3200 },
+                { id: 2, title: 'Проездной билет', category: 'Транспорт', amount: 800 }
+            ];
+
+            function renderExpenses() {
+                expenseList.innerHTML = '';
+                let total = 0;
+
+                expenses.forEach(item => {
+                    total += item.amount;
+                    const li = document.createElement('li');
+                    li.className = 'expense-item';
+                    li.innerHTML = `
+                        <div>
+                            <span style="font-weight: 600;">${escapeHtml(item.title)}</span>
+                            <span class="category-tag">${escapeHtml(item.category)}</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 1rem;">
+                            <span style="font-weight: 700; color: var(--text-main); font-family: var(--font-family);">-${item.amount.toLocaleString('ru-RU')} ₽</span>
+                            <button class="expense-delete" onclick="deleteExpense(${item.id})" aria-label="Удалить запись">✕</button>
+                        </div>
+                    `;
+                    expenseList.appendChild(li);
+                });
+
+                totalExpenseDisplay.textContent = `${total.toLocaleString('ru-RU')} ₽`;
+            }
+
+            window.deleteExpense = function(id) {
+                expenses = expenses.filter(item => item.id !== id);
+                renderExpenses();
+            };
+
+            expenseForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const title = expenseTitle.value.trim();
+                const category = expenseCategory.value;
+                const amount = parseFloat(expenseAmount.value);
+
+                if (title && amount > 0) {
+                    expenses.push({ id: Date.now(), title, category, amount });
+                    renderExpenses();
+                    expenseTitle.value = '';
+                    expenseAmount.value = '';
+                }
+            });
+
+            function escapeHtml(str) {
+                return str.replace(/[&<>"']/g, function(m) {
+                    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
+                });
+            }
+
+            renderExpenses();
+
+            /* ==========================================================================
+               3. FAQ ACCORDION LOGIC
+               ========================================================================== */
+            const faqButtons = document.querySelectorAll('.faq-button');
+
+            faqButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const faqItem = button.parentElement;
+                    const isOpen = faqItem.classList.contains('active');
+
+                    // Close all active items
+                    document.querySelectorAll('.faq-item').forEach(item => {
+                        item.classList.remove('active');
+                        item.querySelector('.faq-button').setAttribute('aria-expanded', 'false');
+                    });
+
+                    // Toggle clicked item
+                    if (!isOpen) {
+                        faqItem.classList.add('active');
+                        button.setAttribute('aria-expanded', 'true');
+                    }
+                });
+            });
+
+            /* ==========================================================================
+               4. MOBILE MENU & ACCESSIBILITY
+               ========================================================================== */
+            const mobileToggle = document.getElementById('mobileToggle');
+            const mobileMenu = document.getElementById('mobileMenu');
+            const mobileNavLinks = document.querySelectorAll('.mobile-nav-link');
+
+            function toggleMenu() {
+                const isOpen = mobileMenu.classList.toggle('active');
+                mobileToggle.setAttribute('aria-expanded', isOpen);
+                mobileToggle.textContent = isOpen ? '[✕]' : '[≡]';
+            }
+
+            mobileToggle.addEventListener('click', toggleMenu);
+
+            mobileNavLinks.forEach(link => {
+                link.addEventListener('click', () => {
+                    if (mobileMenu.classList.contains('active')) {
+                        toggleMenu();
+                    }
+                });
+            });
+
+            // Close mobile menu on Escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && mobileMenu.classList.contains('active')) {
+                    toggleMenu();
+                }
+            });
+
+            /* ==========================================================================
+               5. SCROLL ANIMATIONS (INTERSECTION OBSERVER)
+               ========================================================================== */
+            const observerOptions = { threshold: 0.15 };
+
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('animated');
+                    }
+                });
+            }, observerOptions);
+
+            document.querySelectorAll('.animate-on-scroll').forEach(el => {
+                observer.observe(el);
+            });
+        });
+    </script>
+</body>
+</html>
